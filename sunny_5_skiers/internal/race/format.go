@@ -49,6 +49,15 @@ func printResults(r *Race) {
 		fmt.Printf("%d/%d\n", r.Config.FiringLines*5-sk.PenaltyLaps, r.Config.FiringLines*5)
 	}
 }
+
+func printLog(r *Race, log string, e *model.Event) error {
+	_, err := fmt.Fprintf(r.LogWriter, "[%s] %s\n", r.Config.Start.Add(e.Time).Format("15:04:05.000"), log)
+	if err != nil {
+		return fmt.Errorf("error writing to log: %v", err)
+	}
+	return nil
+}
+
 func formatDuration(d time.Duration) string {
 	return time.Unix(0, d.Nanoseconds()).UTC().Format("15:04:05.000")
 }

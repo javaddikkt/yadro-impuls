@@ -24,21 +24,6 @@ func (r *Race) initHandlers() {
 	}
 }
 
-func (r *Race) handleEvent(e *model.Event) error {
-	if e.ID == model.EventRegistration {
-		return r.handlers[e.ID](nil, e)
-	}
-	skier, ok := r.skiers[e.SkierID]
-	if !ok {
-		return fmt.Errorf("skier %d not registered", e.SkierID)
-	}
-	h := r.handlers[e.ID]
-	if h == nil {
-		return fmt.Errorf("unknown event ID %d", e.ID)
-	}
-	return h(skier, e)
-}
-
 func (r *Race) handleRegister(_ *model.Skier, e *model.Event) error {
 	if _, dup := r.skiers[e.SkierID]; dup {
 		return fmt.Errorf("duplicate registration for %d", e.SkierID)
@@ -50,7 +35,8 @@ func (r *Race) handleRegister(_ *model.Skier, e *model.Event) error {
 		CurrentHits:   make(map[int]bool, 5),
 		CurrentRanges: make(map[int]bool, r.Config.FiringLines),
 	}
-	return nil
+	str := fmt.Sprintf("The competitor(%d) registered", e.SkierID)
+	return printLog(r, str, e)
 }
 
 func (r *Race) handleDraw(sk *model.Skier, e *model.Event) error {
@@ -63,15 +49,17 @@ func (r *Race) handleDraw(sk *model.Skier, e *model.Event) error {
 	}
 	sk.PlannedStart = t.Sub(r.Config.Start)
 	sk.State = model.StateTimeDraw
-	return nil
+	str := fmt.Sprintf("The start time for the competitor(%d) was set by a draw to %s", e.SkierID, e.Param)
+	return printLog(r, str, e)
 }
 
-func (r *Race) handleOnStart(sk *model.Skier, _ *model.Event) error {
+func (r *Race) handleOnStart(sk *model.Skier, e *model.Event) error {
 	if sk.State != model.StateTimeDraw {
 		return fmt.Errorf("skier %d not drawn", sk.ID)
 	}
 	sk.State = model.StateOnLine
-	return nil
+	str := fmt.Sprintf("The competitor(%d) is on the start line", e.SkierID)
+	return printLog(r, str, e)
 }
 
 func (r *Race) handleOnLap(sk *model.Skier, e *model.Event) error {
@@ -80,12 +68,14 @@ func (r *Race) handleOnLap(sk *model.Skier, e *model.Event) error {
 	}
 	if e.Time > sk.PlannedStart+r.Config.StartDelta {
 		sk.State = model.StateDisqualified
-		return nil
+		str := fmt.Sprintf("The competitor(%d) is disqualified", e.SkierID)
+		return printLog(r, str, e)
 	}
 	sk.State = model.StateOnLap
 	sk.ActualStart = e.Time
 	sk.CurrentRanges = make(map[int]bool, r.Config.FiringLines)
-	return nil
+	str := fmt.Sprintf("The competitor(%d) has started", e.SkierID)
+	return printLog(r, str, e)
 }
 
 func (r *Race) handleOnRange(sk *model.Skier, e *model.Event) error {
@@ -103,7 +93,8 @@ func (r *Race) handleOnRange(sk *model.Skier, e *model.Event) error {
 	sk.CurrentHits = make(map[int]bool, 5)
 	sk.Hits = 0
 	sk.State = model.StateOnRange
-	return nil
+	str := fmt.Sprintf("The competitor(%d) is on the firing range(%s)", e.SkierID, e.Param)
+	return printLog(r, str, e)
 }
 
 func (r *Race) handleHit(sk *model.Skier, e *model.Event) error {
@@ -123,17 +114,19 @@ func (r *Race) handleHit(sk *model.Skier, e *model.Event) error {
 		return fmt.Errorf("skier %d too many shots", sk.ID)
 	}
 	sk.State = model.StateHit
-	return nil
+	str := fmt.Sprintf("The target(%s) has been hit by competitor(%d)", e.Param, e.SkierID)
+	return printLog(r, str, e)
 }
 
-func (r *Race) handleOffRange(sk *model.Skier, _ *model.Event) error {
+func (r *Race) handleOffRange(sk *model.Skier, e *model.Event) error {
 	if sk.State != model.StateHit && sk.State != model.StateOnRange {
 		return fmt.Errorf("skier %d not finished shooting", sk.ID)
 	}
 	misses := 5 - sk.Hits
 	sk.PenaltyLaps += misses
 	sk.State = model.StateOffRange
-	return nil
+	str := fmt.Sprintf("The competitor(%d) left the firing range", e.SkierID)
+	return printLog(r, str, e)
 }
 
 func (r *Race) handleOnPenalty(sk *model.Skier, e *model.Event) error {
@@ -142,7 +135,8 @@ func (r *Race) handleOnPenalty(sk *model.Skier, e *model.Event) error {
 	}
 	sk.State = model.StateOnPenalty
 	sk.PenaltyStart = e.Time
-	return nil
+	str := fmt.Sprintf("The competitor(%d) entered the penalty laps", e.SkierID)
+	return printLog(r, str, e)
 }
 
 func (r *Race) handleOffPenalty(sk *model.Skier, e *model.Event) error {
@@ -151,7 +145,8 @@ func (r *Race) handleOffPenalty(sk *model.Skier, e *model.Event) error {
 	}
 	sk.State = model.StateOffPenalty
 	sk.PenaltyTime += e.Time - sk.PenaltyStart
-	return nil
+	str := fmt.Sprintf("The competitor(%d) left the penalty laps", e.SkierID)
+	return printLog(r, str, e)
 }
 
 func (r *Race) handleOffLap(sk *model.Skier, e *model.Event) error {
@@ -165,7 +160,8 @@ func (r *Race) handleOffLap(sk *model.Skier, e *model.Event) error {
 
 	if sk.LapsCompleted == r.Config.Laps {
 		sk.State = model.StateOffLap
-		return nil
+		str := fmt.Sprintf("The competitor(%d) successfully finished", e.SkierID)
+		return printLog(r, str, e)
 	}
 
 	sk.State = model.StateOnLap
@@ -173,10 +169,12 @@ func (r *Race) handleOffLap(sk *model.Skier, e *model.Event) error {
 	sk.CurrentRanges = make(map[int]bool, r.Config.FiringLines)
 	sk.CurrentHits = make(map[int]bool, 5)
 	sk.Hits = 0
-	return nil
+	str := fmt.Sprintf("The competitor(%d) ended the main lap", e.SkierID)
+	return printLog(r, str, e)
 }
 
-func (r *Race) handleFail(sk *model.Skier, _ *model.Event) error {
+func (r *Race) handleFail(sk *model.Skier, e *model.Event) error {
 	sk.State = model.StateFail
-	return nil
+	str := fmt.Sprintf("The competitor(%d) cant continue: %s", e.SkierID, e.Param)
+	return printLog(r, str, e)
 }

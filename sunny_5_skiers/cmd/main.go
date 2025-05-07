@@ -10,8 +10,8 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("usage: biathlon <config.json> <events_file>")
+	if len(os.Args) < 4 {
+		fmt.Println("usage: biathlon <config.json> <events_file> <output_file>")
 		os.Exit(1)
 	}
 
@@ -23,7 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := parser.ParseEvents(os.Args[2], &cfg); err != nil {
+	if err := parser.ParseEvents(os.Args[2], os.Args[3], &cfg); err != nil {
 		log.Fatal(err)
 	}
 }
