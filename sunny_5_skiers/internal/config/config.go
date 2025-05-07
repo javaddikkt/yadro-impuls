@@ -41,7 +41,10 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	c.Start = t
 
 	zero, _ := time.Parse("15:04:05", "00:00:00")
-	delta, _ := time.Parse("15:04:05", aux.StartDelta)
+	delta, err := time.Parse("15:04:05", aux.StartDelta)
+	if err != nil {
+		return err
+	}
 	c.StartDelta = delta.Sub(zero)
 	return nil
 }

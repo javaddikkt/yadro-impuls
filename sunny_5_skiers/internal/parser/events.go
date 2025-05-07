@@ -49,9 +49,21 @@ func ParseEvents(eventsPath string, outputPath string, cfg *config.Config) error
 
 func parseEvent(line string, cfg *config.Config) (*model.Event, error) {
 	p := strings.Fields(line)
-	ts, _ := time.Parse("15:04:05.000", strings.Trim(p[0], "[]"))
-	id, _ := strconv.Atoi(p[1])
-	sk, _ := strconv.ParseInt(p[2], 10, 64)
+	if len(p) < 3 || len(p) > 4 {
+		return nil, fmt.Errorf("error parsing event, wrong number of fields: %d", len(p))
+	}
+	ts, err := time.Parse("15:04:05.000", strings.Trim(p[0], "[]"))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing time: %v", err)
+	}
+	id, err := strconv.Atoi(p[1])
+	if err != nil {
+		return nil, fmt.Errorf("error parsing event id: %v", err)
+	}
+	sk, err := strconv.ParseInt(p[2], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing skier id: %v", err)
+	}
 	param := strings.Join(p[3:], " ")
 	return &model.Event{Time: ts.Sub(cfg.Start), ID: id, SkierID: sk, Param: param}, nil
 }
